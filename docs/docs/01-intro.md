@@ -1,6 +1,5 @@
 ---
 id: intro
-slug: /
 title: "Introduction: The Problem We Are Solving"
 sidebar_position: 1
 ---
