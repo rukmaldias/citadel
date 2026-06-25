@@ -350,25 +350,30 @@ After the obfuscated build, run `patch_so` exactly as in Step 5d (the slots are 
 
 ## Step 6 — Set up the Android project
 
-Copy the Kotlin wrapper and update the package declaration:
+`SecureVm.kt` **must** live in the package that matches the JNI export prefix compiled into the `.so`. The default prefix is `Java_com_example_securevm_SecureVm_*`. Moving the file to a different package without recompiling the `.so` will compile silently but throw `UnsatisfiedLinkError` at runtime.
+
+**Option A — keep the default package (quickest):**
 
 ```sh
 cp android/SecureVm.kt \
-   android-app/app/src/main/java/com/yourcompany/yourapp/SecureVm.kt
+   android-app/app/src/main/java/com/example/securevm/SecureVm.kt
 ```
 
-Update the first line: `package com.yourcompany.yourapp`
+**Option B — use your own package (recommended for production):**
 
-Also update the JNI export names in `src/jni_api.rs` (every function prefixed `Java_com_example_securevm_SecureVm_`) to match your package, then rebuild the `.so`.
+1. Edit every `Java_com_example_securevm_SecureVm_` prefix in `src/jni_api.rs` to your package (e.g. `Java_com_yourcompany_yourapp_SecureVm_`).
+2. Rebuild the `.so` (Steps 5c–5d).
+3. Copy `SecureVm.kt` to your path and update its `package` declaration.
+4. Update the `-keep class` rule in `proguard-rules.pro` to the new class path.
 
-Expected project structure after Steps 4–6:
+Expected project structure after Steps 4–6 (Option A):
 
 ```
 android-app/app/src/main/
 ├── assets/
-│   ├── license.bin       ← Step 4
-│   ├── firmware.bin      ← Step 4
-│   └── codesign.bin      ← Step 4
+│   ├── license.bin           ← Step 4
+│   ├── firmware.bin          ← Step 4
+│   └── codesign.bin          ← Step 4
 ├── jniLibs/
 │   ├── arm64-v8a/
 │   │   └── libsecure_android_vm.so   ← Steps 5c–5d (or 5e)
@@ -376,8 +381,11 @@ android-app/app/src/main/
 │   │   └── libsecure_android_vm.so
 │   └── x86_64/
 │       └── libsecure_android_vm.so
-└── java/com/yourcompany/yourapp/
-    └── SecureVm.kt       ← Step 6
+└── java/
+    ├── com/example/securevm/
+    │   └── SecureVm.kt       ← Step 6 (must match .so JNI prefix)
+    └── com/yourcompany/yourapp/
+        └── MainActivity.kt   ← your app code
 ```
 
 ---
@@ -385,7 +393,7 @@ android-app/app/src/main/
 ## Step 7 — Use the VM in Kotlin
 
 ```kotlin
-import com.yourcompany.yourapp.SecureVm
+import com.example.securevm.SecureVm   // adjust to match your Step 6 choice
 
 fun runSecureVm(context: Context) {
     SecureVm().use { vm ->
