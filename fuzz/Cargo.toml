@@ -4,6 +4,9 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[package.metadata]
+cargo-fuzz = true
+
 # cargo-fuzz requires the fuzz crate to declare its own workspace so it is
 # not accidentally absorbed into a parent workspace.
 [workspace]
