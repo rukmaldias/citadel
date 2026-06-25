@@ -22,9 +22,9 @@ ignore = []
 
 [licenses]
 # cargo-deny >= 0.16: only 'allow', 'exceptions', and 'confidence-threshold'
-# remain. Anything not in the allow list is implicitly denied. Copyleft
-# licenses (GPL, LGPL, AGPL) are excluded by omission.
+# remain. Anything not in the allow list is implicitly denied.
 allow = [
+    "GPL-3.0-only",
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
