@@ -236,6 +236,12 @@ pub struct SecureVm {
     /// Never set this in a production license — the trace output is visible to
     /// anyone who can read logcat on the device.
     debug_mode: bool,
+    /// When `true`, `is_debugger_attached()` checks are suppressed for both the
+    /// startup gate and the periodic in-execution check. Controlled by bit 1 of
+    /// `firmware_flags` in the decrypted license. Use only in development
+    /// licenses bound to a debug signing certificate. Never ship a production
+    /// license with this flag set.
+    allow_debugger: bool,
 }
 
 impl Default for SecureVm {
@@ -285,6 +291,7 @@ impl SecureVm {
             nonce_prefix,
             nonce_counter: 0,
             debug_mode: false,
+            allow_debugger: false,
         }
     }
 
@@ -361,10 +368,16 @@ impl SecureVm {
             return StartCode::InvalidInput;
         }
 
-        // Step 1: check environment before doing any crypto. Refuses to start
-        // if a debugger/injector is attached, the device is rooted, the
-        // process is running inside an emulator, or the .so has been patched.
-        if is_debugger_attached() || is_rooted() || is_emulator() || !check_so_integrity() {
+        // Step 1a: pre-decryption environment checks — root, emulator, and .so
+        // integrity are independent of the license contents and are checked here
+        // (before any KDF work) because they are cheap and prevent an attacker
+        // from setting breakpoints on KDF outputs.
+        //
+        // is_debugger_attached() is intentionally NOT checked here. It moves to
+        // Step 1b, after the license is decrypted, so that bit 1 of
+        // firmware_flags (ALLOW_DEBUGGER) can suppress it for development
+        // licenses bound to a debug signing certificate.
+        if is_rooted() || is_emulator() || !check_so_integrity() {
             return StartCode::EnvironmentBlocked;
         }
 
@@ -383,8 +396,19 @@ impl SecureVm {
                 bundle.decrypt_program_and_customer_key(&identity, codesign_public_key)?;
             self.load_program(program)?;
 
-            // Bit 0 of firmware_flags enables the per-instruction debug trace.
+            // Bit 0: per-instruction debug trace to logcat. Never set in production.
             self.debug_mode = firmware_flags & 0x01 != 0;
+            // Bit 1: suppress is_debugger_attached() for development licenses.
+            // The flag is inside AES-GCM encrypted + Ed25519-signed assets, so
+            // it cannot be forged without breaking authentication. Never set in
+            // a production license — it allows any debugger to attach freely.
+            self.allow_debugger = firmware_flags & 0x02 != 0;
+
+            // Step 1b: debugger check, now that we know the license flags.
+            // Skipped only when the license explicitly permits it (dev builds).
+            if !self.allow_debugger && is_debugger_attached() {
+                return Err(VmError::EnvironmentBlocked);
+            }
 
             // Place the customer-data key into storage. The hardware Keystore
             // path (StrongBox → TEE) is tried first inside
@@ -456,6 +480,7 @@ impl SecureVm {
         self.nonce_prefix.zeroize();
         rand::thread_rng().fill_bytes(&mut self.nonce_prefix);
         self.debug_mode = false;
+        self.allow_debugger = false;
         Ok(())
     }
 
@@ -637,7 +662,11 @@ impl SecureVm {
             }
 
             // Periodic debugger check to catch late-attached tracers.
-            if steps % DEBUGGER_CHECK_INTERVAL == 0 && is_debugger_attached() {
+            // Suppressed when the license sets ALLOW_DEBUGGER (bit 1).
+            if steps % DEBUGGER_CHECK_INTERVAL == 0
+                && !self.allow_debugger
+                && is_debugger_attached()
+            {
                 let _ = self.stop();
                 return Err(VmError::EnvironmentBlocked);
             }

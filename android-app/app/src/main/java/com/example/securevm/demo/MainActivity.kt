@@ -162,7 +162,11 @@ class MainActivity : AppCompatActivity() {
 
         // ── startFromAssets() — the full 10-step verification pipeline ───────
         //
-        //  Step 1: Environment checks (debugger, root, emulator)
+        //  Step 1a: Root / emulator / .so integrity checks (always enforced)
+        //  Step 1b: Debugger check (skipped when licence bit 1 = ALLOW_DEBUGGER)
+        //           Generate a dev licence with firmware_flags: 3 to allow the
+        //           Android Studio debugger to attach during development. See the
+        //           "VM debug mode" section of the developer docs.
         //  Step 2: SHA-256 self-integrity of the .so ELF RX segment
         //  Step 3: Build CodeIdentity (package name + cert + installer)
         //  Step 4: Ed25519 signature over both asset hashes + identity

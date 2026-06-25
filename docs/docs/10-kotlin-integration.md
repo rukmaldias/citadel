@@ -214,7 +214,18 @@ if (encoded != null) {
 
 ## VM debug mode
 
-During development, set `"firmware_flags": 1` in `licensepack.json`. Every instruction will log a trace to logcat:
+`firmware_flags` in `licensepack.json` is a bitmask. Two bits are defined:
+
+| Bit | Value | Effect |
+|---|---|---|
+| 0 | `1` | Per-instruction logcat trace (`[SVM-DEBUG]` prefix) |
+| 1 | `2` | Allow debugger — suppresses `is_debugger_attached()` checks |
+
+Set both for a full development licence: `"firmware_flags": 3`
+
+**Bit 0 — instruction trace (`firmware_flags: 1`)**
+
+Every instruction logs to logcat so you can follow execution step by step:
 
 ```
 [SVM-DEBUG] step=     1 pc=    0 instr=PushI64(40)   stack_depth=0
@@ -227,10 +238,26 @@ During development, set `"firmware_flags": 1` in `licensepack.json`. Every instr
 [SVM-DEBUG] HALT  result=42 steps=4
 ```
 
-The flag is embedded inside the *encrypted* licence. You cannot enable it at runtime without re-issuing the licence. `stop()` resets it to false.
+**Bit 1 — allow debugger (`firmware_flags: 2`)**
+
+When set, the VM skips `is_debugger_attached()` at startup and during execution. This allows you to attach the Android Studio debugger and inspect decrypted data, derived keys, and SecureStore contents at breakpoints — using `startFromAssets()` with real assets, not a fake bypass.
+
+The flag lives inside the AES-GCM encrypted licence. It cannot be forged by an attacker without breaking authentication.
+
+**Development workflow:**
+
+1. Generate a dev licence with `"firmware_flags": 3` and `"installer_policy": "any"` bound to your **debug signing certificate**.
+2. Place it in `app/src/main/assets/` alongside `firmware.bin` and `codesign.bin`.
+3. Attach the Android Studio debugger normally — `startFromAssets()` will proceed past the debugger check.
+4. Before release, re-issue the licence with `"firmware_flags": 0` bound to your **release signing certificate**.
+
+The flags are embedded inside the *encrypted* licence. You cannot change them at runtime without re-issuing the licence. `stop()` resets both flags to false.
 
 :::danger
 
-Never ship production assets with `firmware_flags: 1`. The trace is readable by anyone with `adb logcat` access and reveals every computation value and branch outcome, including intermediate results that might be sensitive.
+Never ship production assets with `firmware_flags` bits 0 or 1 set.
+
+- Bit 0 trace output is readable by anyone with `adb logcat` access and reveals every intermediate computation value.
+- Bit 1 allows any debugger to attach to your production app and inspect memory freely.
 
 :::
