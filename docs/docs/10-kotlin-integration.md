@@ -214,14 +214,16 @@ if (encoded != null) {
 
 ## VM debug mode
 
-`firmware_flags` in `licensepack.json` is a bitmask. Two bits are defined:
+`firmware_flags` in `licensepack.json` is a bitmask. Both bits are always `0` in production.
 
-| Bit | Value | Effect |
-|---|---|---|
-| 0 | `1` | Per-instruction logcat trace (`[SVM-DEBUG]` prefix) |
-| 1 | `2` | Allow debugger — suppresses `is_debugger_attached()` checks |
+| `firmware_flags` | Binary | VM trace logs | Debugger allowed |
+|---|---|---|---|
+| `0` | `00` | No | No (production) |
+| `1` | `01` | Yes | No |
+| `2` | `10` | No | Yes |
+| `3` | `11` | Yes | Yes |
 
-Set both for a full development licence: `"firmware_flags": 3`
+Use `3` for a full development licence (trace + debugger). Use `0` for all production releases.
 
 **Bit 0 — instruction trace (`firmware_flags: 1`)**
 

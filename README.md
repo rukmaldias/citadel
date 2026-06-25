@@ -431,12 +431,14 @@ fun runSecureVm(context: Context) {
 
 `firmware_flags` in `licensepack.json` is a bitmask. Both bits are always `0` in production.
 
-| Bit | Value | Effect |
-|---|---|---|
-| 0 | `1` | Per-instruction logcat trace (`[SVM-DEBUG]` prefix) |
-| 1 | `2` | Allow debugger — suppresses `is_debugger_attached()` checks at startup and during execution |
+| `firmware_flags` | Binary | VM trace logs | Debugger allowed |
+|---|---|---|---|
+| `0` | `00` | No | No (production) |
+| `1` | `01` | Yes | No |
+| `2` | `10` | No | Yes |
+| `3` | `11` | Yes | Yes |
 
-Set both for a full development licence: `"firmware_flags": 3`
+Use `3` for a full development licence (trace + debugger). Use `0` for all production releases.
 
 **Instruction trace (bit 0)** — every instruction emits a `[SVM-DEBUG]` line to stderr (desktop) or logcat (Android):
 

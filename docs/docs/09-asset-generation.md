@@ -110,7 +110,7 @@ fn build_firmware(opcode_seed: &[u8; 32]) -> Vec<u8> {
 | id | Your package identifier string, e.g., `com.yourcompany.yourapp`. Mixed into the Argon2id password so a licence for one package cannot decrypt content intended for another. |
 | installer_policy | `"required:com.android.vending"` for production (Play Store only). `"any"` for development or sideload-only deployments. For `required` licences the installer name is also mixed into the Argon2id KDF (licence key derivation domain `v4`): a wrong installer at runtime produces the wrong key and AES-GCM authentication fails — no plaintext is ever produced. **Note:** `"any"` uses an empty string in the KDF, so it is compatible with sideload/unknown installers only; Play Store installs (`"com.android.vending"`) produce a non-empty installer string and will fail to decrypt an `"any"`-policy licence. Use `required` for all app-store distributions. |
 | valid_until (u64) | Unix timestamp for licence expiry. `0` = never expires. For limited licences: `date -d "2030-01-01" +%s` gives you the Unix timestamp. |
-| firmware_flags (u32) | Bitmask. Bit 0 = per-instruction logcat trace. Bit 1 = allow Android Studio debugger (skips `is_debugger_attached()` — for dev licences only). Set to `3` during development for both. Always `0` in production. |
+| firmware_flags (u32) | Bitmask: `0` = production, `1` = trace only, `2` = debugger only, `3` = trace + debugger (recommended for development). Always `0` in production. See the VM debug mode section in the Kotlin integration guide for the full table. |
 
 ```bash
 # Make your private key available
