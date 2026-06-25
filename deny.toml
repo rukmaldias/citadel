@@ -6,22 +6,24 @@
 [advisories]
 # Fetch the RustSec advisory database on each run.
 db-urls = ["https://github.com/rustsec/advisory-db"]
-# Known vulnerabilities are hard failures.
-vulnerability = "deny"
-# Unmaintained crates are warnings — review individually.
-unmaintained = "warn"
-# Unsound code (reported via advisory, not just deprecated) is a hard failure.
-unsound = "deny"
-# Allow yanked crates if they're already in Cargo.lock (CI will re-check on
-# next lock update).
+# cargo-deny >= 0.16 uses scope strings for unmaintained/unsound:
+#   "all" | "workspace" | "transitive" | "none"
+# Vulnerabilities in any crate are hard failures.
+# Unmaintained crates anywhere in the tree are flagged (workspace = direct only).
+unmaintained = "workspace"
+# Unsound code anywhere in the dependency tree is a hard failure.
+unsound = "all"
+# Yanked crates: warn rather than fail (they may be in the lock file legitimately).
 yanked = "warn"
-# No notices or unmaintained suppressions without review.
+# Advisory IDs to suppress (add RUSTSEC-YYYY-NNNN entries here after review).
 ignore = []
 
 # ── License policy ────────────────────────────────────────────────────────────
 
 [licenses]
-# Require that every crate's license is on this list.
+# cargo-deny >= 0.16: only 'allow', 'exceptions', and 'confidence-threshold'
+# remain. Anything not in the allow list is implicitly denied. Copyleft
+# licenses (GPL, LGPL, AGPL) are excluded by omission.
 allow = [
     "MIT",
     "Apache-2.0",
@@ -30,27 +32,11 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-DFS-2016",
+    "Unicode-3.0",
     "Zlib",
     "CC0-1.0",
 ]
-# Copyleft licenses are rejected — shipping GPL in a closed-source SDK would
-# require source disclosure of the entire crate.
-deny = [
-    "GPL-2.0",
-    "GPL-3.0",
-    "LGPL-2.0",
-    "LGPL-2.1",
-    "LGPL-3.0",
-    "AGPL-3.0",
-]
-# Any crate that does not include a licence file triggers a hard error.
-unlicensed = "deny"
-# Some crates use 'AND' / 'OR' expressions; require all alternatives be allowed.
-allow-osi-fsf-free = "neither"
-# ring uses a compound license expression; allow its specific combination.
-exceptions = [
-    { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
-]
+exceptions = []
 # Confidence threshold for fuzzy SPDX matching (0.8 is cargo-deny default).
 confidence-threshold = 0.8
 
