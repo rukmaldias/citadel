@@ -1,0 +1,72 @@
+:root {
+  /* Jamstack — light mode */
+  --ifm-color-primary: #c4006a;
+  --ifm-color-primary-dark: #ad005e;
+  --ifm-color-primary-darker: #a30058;
+  --ifm-color-primary-darkest: #870049;
+  --ifm-color-primary-light: #db0076;
+  --ifm-color-primary-lighter: #f0047f;
+  --ifm-color-primary-lightest: #ff2d96;
+
+  --ifm-background-color: #ffffff;
+  --ifm-background-surface-color: #f5f5f7;
+  --ifm-navbar-background-color: #ffffff;
+  --ifm-footer-background-color: #1a1a2e;
+
+  --ifm-font-color-base: #1a1a2e;
+  --ifm-heading-color: #0f0f23;
+  --ifm-link-color: #f0047f;
+  --ifm-menu-color: #333348;
+  --ifm-menu-color-active: #f0047f;
+
+  --ifm-navbar-link-color: #1a1a2e;
+  --ifm-navbar-link-hover-color: #f0047f;
+
+  --ifm-code-background: #f0f0f5;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(240, 4, 127, 0.1);
+
+  --ifm-toc-border-color: #e0e0ea;
+  --ifm-hr-border-color: #e0e0ea;
+  --ifm-blockquote-border-color: #f0047f;
+  --ifm-blockquote-color: #666680;
+}
+
+[data-theme='dark'] {
+  /* Jamstack — dark mode (the signature look) */
+  --ifm-color-primary: #f0047f;
+  --ifm-color-primary-dark: #d8036f;
+  --ifm-color-primary-darker: #cc0369;
+  --ifm-color-primary-darkest: #a80256;
+  --ifm-color-primary-light: #f41e8c;
+  --ifm-color-primary-lighter: #f53595;
+  --ifm-color-primary-lightest: #f86cb5;
+
+  --ifm-background-color: #1a1a2e;
+  --ifm-background-surface-color: #16213e;
+  --ifm-navbar-background-color: #0f0f23;
+  --ifm-footer-background-color: #0f0f23;
+
+  --ifm-font-color-base: #ffffff;
+  --ifm-heading-color: #ffffff;
+  --ifm-link-color: #f0047f;
+  --ifm-menu-color: #c0c0d0;
+  --ifm-menu-color-active: #f0047f;
+
+  --ifm-navbar-link-color: #ffffff;
+  --ifm-navbar-link-hover-color: #f0047f;
+
+  --ifm-code-background: #0f0f23;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(240, 4, 127, 0.2);
+
+  --ifm-toc-border-color: #2a2a4a;
+  --ifm-hr-border-color: #2a2a4a;
+  --ifm-blockquote-border-color: #f0047f;
+  --ifm-blockquote-color: #a0a0b0;
+}
+
+/* Pink glow on active sidebar item */
+[data-theme='dark'] .menu__link--active {
+  text-shadow: 0 0 12px rgba(240, 4, 127, 0.5);
+}
