@@ -1,0 +1,20 @@
+# Cargo workspace configuration.
+#
+# Linker entries here are fallbacks for direct `cargo build --target <android>`
+# invocations (e.g. rust-analyzer, local dev without cargo-ndk).
+# cargo-ndk overrides them at runtime via CARGO_TARGET_<TRIPLE>_LINKER.
+#
+# RUSTFLAGS for the obfuscated build are NOT set here because:
+#   - RUSTFLAGS env var overrides [target.*.rustflags] entirely.
+#   - The plugin path is a runtime artefact (build/obfuscator/plugin_path.txt).
+# Use scripts/build_android_obfuscated.sh, which sets RUSTFLAGS before invoking
+# cargo ndk.
+
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android26-clang"
+
+[target.armv7-linux-androideabi]
+linker = "armv7a-linux-androideabi26-clang"
+
+[target.x86_64-linux-android]
+linker = "x86_64-linux-android26-clang"

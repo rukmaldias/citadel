@@ -1,0 +1,68 @@
+[package]
+name = "secure_android_vm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# The three enforce_* features are on by default so a developer cannot
+# accidentally ship a binary with placeholder zeros. They all guard their
+# checks with `#[cfg(not(test))]` so the test suite is unaffected.
+default = ["enforce_patch", "enforce_embed_secret", "enforce_codesign_key"]
+# When enabled, an unpatched (all-zero) integrity slot is treated as a failure
+# instead of a silent bypass. On by default — disable only for local dev builds
+# where you have not yet run patch_so.
+enforce_patch = []
+# When enabled, derive_license_key returns Err if LICENSE_EMBED_SECRET is still
+# the all-zeros placeholder. On by default — disable only if you intentionally
+# want the weak development KDF during local testing.
+enforce_embed_secret = []
+# When enabled, start_with_verified_assets returns InvalidInput if the compiled-in
+# Ed25519 codesign public key is still the all-zeros placeholder.
+# On by default — disable only for local dev/test builds.
+enforce_codesign_key = []
+# When enabled, SecureStore uses Argon2id m=131072 / t=4 and writes SVMSTORE04
+# blobs. Existing SVMSTORE03 blobs become unreadable; re-encrypt before enabling.
+store_strong_kdf = []
+jni = ["dep:jni", "dep:zip"]
+
+[dependencies]
+aes-gcm = { version = "0.10", features = ["std"] }
+argon2 = "0.5"
+ed25519-dalek = "2"
+flate2 = "1.0"
+hmac = { version = "0.12", default-features = false }
+jni = { version = "0.21", optional = true }
+libc = "0.2"
+obfstr = "0.4"
+rand = "0.8"
+rand_chacha = "0.3"
+subtle = "2"
+sha2 = "0.10"
+thiserror = "1"
+zip = { version = "0.6", optional = true, default-features = false, features = ["deflate"] }
+zeroize = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# Profile for obfuscated Android release builds.
+# Inherits from release; sets codegen-units = 1 explicitly so the LLVM plugin
+# sees the entire crate as a single module (important for cross-function CFF).
+# The LTO=thin pass runs first; the plugin fires in OptimizerLastEPCallback
+# after all other passes, so it obfuscates the fully-inlined IR.
+[profile.release-obfuscated]
+inherits = "release"
+codegen-units = 1
+lto = "thin"
+
+[dev-dependencies]
+hex = "0.4"

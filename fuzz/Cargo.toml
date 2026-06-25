@@ -1,0 +1,35 @@
+[package]
+name = "secure-android-vm-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# cargo-fuzz requires the fuzz crate to declare its own workspace so it is
+# not accidentally absorbed into a parent workspace.
+[workspace]
+
+[[bin]]
+name = "fuzz_license_bytes"
+path = "fuzz_targets/fuzz_license_bytes.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_store_bytes"
+path = "fuzz_targets/fuzz_store_bytes.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_program_bytes"
+path = "fuzz_targets/fuzz_program_bytes.rs"
+test = false
+doc = false
+
+[dependencies]
+libfuzzer-sys = "0.4"
+secure_android_vm = { path = "..", default-features = false }
+
+[profile.release]
+opt-level = 3
+debug = false

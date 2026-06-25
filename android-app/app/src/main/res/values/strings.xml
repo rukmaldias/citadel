@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SecureVm Demo</string>
+    <string name="btn_run">Run Firmware</string>
+    <string name="btn_encrypt">Encrypt / Decrypt Data</string>
+    <string name="btn_store">SecureStore Round-Trip</string>
+    <string name="status_init">Initialising…</string>
+</resources>

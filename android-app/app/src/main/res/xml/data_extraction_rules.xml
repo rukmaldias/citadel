@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    data_extraction_rules.xml (Android 12+)
+
+    Disables cloud backup AND device-to-device transfer for ALL app data.
+
+    WHY: SecureVm-encrypted blobs stored in SharedPreferences are keyed by
+    an Android Keystore key that does NOT transfer across devices.  If these
+    blobs were backed up and restored on a new device, they would be
+    permanently unreadable (the Keystore key is device-bound).  Disabling
+    backup prevents a confusing "data loss" experience for the user.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file"       path="." />
+        <exclude domain="database"   path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file"       path="." />
+        <exclude domain="database"   path="." />
+    </device-transfer>
+</data-extraction-rules>

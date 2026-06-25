@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    AndroidManifest.xml — Secure VM Demo Application
+
+    PERMISSIONS
+    ══════════════════════════════════════════════════════════════════════════════
+    The SecureVm library itself requires NO special Android permissions for its
+    core operations:
+
+      • Asset reading       → own-app assets, no permission needed
+      • /proc/self/cmdline  → own process, no permission needed
+      • APK certificate     → reads own APK file, no permission needed
+      • Android Keystore    → hardware-backed key storage, no permission needed
+      • PackageManager      → installer query, no permission needed
+
+    If YOUR app stores encrypted data in shared storage or communicates with a
+    licence server, add the relevant permissions below.
+
+    INTERNET — uncomment if your app does server-side licence validation or
+    phones home for key distribution. The SecureVm library itself is fully
+    offline; this permission is solely for app-level network calls.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ──────────────────────────────────────────────────────────────────────
+         Optional: add if your app makes network calls for remote key delivery
+         or server-side licence checks.
+         <uses-permission android:name="android.permission.INTERNET" />
+    ────────────────────────────────────────────────────────────────────────── -->
+
+    <!--
+        USE_BIOMETRIC — uncomment if you want the user to authenticate with
+        fingerprint/face before the VM starts. Biometric auth can guard the
+        passphrase that unlocks SecureStore, adding a user-presence check.
+        <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    -->
+
+    <application
+        android:name=".DemoApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+
+        <!--
+            allowBackup="false" and fullBackupContent="false":
+            Encrypted-at-rest data managed by SecureVm must NOT be backed up via
+            Auto Backup. The backup would contain ciphertext but the AES key lives
+            only in Android Keystore, which is NOT included in backups (by design).
+            Restoring backed-up data onto a different device would leave it
+            permanently unreadable. Disable backups for any Activity/Service that
+            holds or produces SecureVm-encrypted data.
+
+            If you need selective backup, create an xml/backup_rules.xml file that
+            explicitly excludes the SecureStore blob and any encrypted files.
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

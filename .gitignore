@@ -1,0 +1,10 @@
+/target/
+/build/
+tools/gen_assets/target/
+*.rlib
+.DS_Store
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc

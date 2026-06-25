@@ -1,0 +1,18 @@
+[package]
+name = "gen_assets"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "gen_assets"
+path = "src/main.rs"
+
+[dependencies]
+secure_android_vm = { path = "../.." }
+ed25519-dalek = "2"
+hex = "0.4"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

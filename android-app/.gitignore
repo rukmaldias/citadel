@@ -1,0 +1,17 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Production asset files — never commit; distribute via CI/CD secrets
+app/src/main/assets/license.bin
+app/src/main/assets/firmware.bin
+app/src/main/assets/codesign.bin
+
+# Compiled native libraries — never commit; distribute via CI/CD artifacts
+app/src/main/jniLibs/**/*.so

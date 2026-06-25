@@ -1,0 +1,78 @@
+# cargo-deny configuration — run with: cargo deny check
+# See https://embarkstudios.github.io/cargo-deny/
+
+# ── Advisory database ─────────────────────────────────────────────────────────
+
+[advisories]
+# Fetch the RustSec advisory database on each run.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Known vulnerabilities are hard failures.
+vulnerability = "deny"
+# Unmaintained crates are warnings — review individually.
+unmaintained = "warn"
+# Unsound code (reported via advisory, not just deprecated) is a hard failure.
+unsound = "deny"
+# Allow yanked crates if they're already in Cargo.lock (CI will re-check on
+# next lock update).
+yanked = "warn"
+# No notices or unmaintained suppressions without review.
+ignore = []
+
+# ── License policy ────────────────────────────────────────────────────────────
+
+[licenses]
+# Require that every crate's license is on this list.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+]
+# Copyleft licenses are rejected — shipping GPL in a closed-source SDK would
+# require source disclosure of the entire crate.
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "LGPL-2.0",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "AGPL-3.0",
+]
+# Any crate that does not include a licence file triggers a hard error.
+unlicensed = "deny"
+# Some crates use 'AND' / 'OR' expressions; require all alternatives be allowed.
+allow-osi-fsf-free = "neither"
+# ring uses a compound license expression; allow its specific combination.
+exceptions = [
+    { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
+]
+# Confidence threshold for fuzzy SPDX matching (0.8 is cargo-deny default).
+confidence-threshold = 0.8
+
+# ── Crate bans ────────────────────────────────────────────────────────────────
+
+[bans]
+# Multiple versions of the same crate are warnings — often unavoidable
+# transiently but should be resolved over time.
+multiple-versions = "warn"
+# Deny crates known to have been involved in supply-chain attacks or that
+# have no legitimate use in a security SDK.
+deny = []
+# Skip duplicate-version warnings for crates where version fragmentation is
+# an accepted upstream reality.
+skip = []
+skip-tree = []
+
+# ── Source policy ─────────────────────────────────────────────────────────────
+
+[sources]
+# Only allow crates from crates.io; git sources are not audited by RustSec.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

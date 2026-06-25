@@ -1,0 +1,346 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Dummy firmware secret used only by the CI patch_so step to verify the
+  # tool runs successfully. Not a real production secret.
+  CI_FIRMWARE_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
+
+jobs:
+  # ── 1. Host tests and static analysis ───────────────────────────────────────
+  test:
+    name: Test (host)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run tests without the enforce_* defaults so the placeholder keys used
+      # in test fixtures are accepted. The guards are already gated on
+      # `#[cfg(not(test))]` but --no-default-features makes the intent explicit.
+      - name: Run test suite
+        run: cargo test --no-default-features
+
+      - name: Clippy (no default features)
+        run: cargo clippy --no-default-features -- -D warnings
+
+      # Verify the full default feature set (enforce_patch + enforce_embed_secret
+      # + enforce_codesign_key) at least compiles on the host.
+      - name: Check (default features)
+        run: cargo check
+
+  # ── 2. Android cross-compilation + patch_so ──────────────────────────────────
+  android-build:
+    name: Build Android (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+          - abi: x86_64
+            target: x86_64-linux-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-android-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK r27
+        run: |
+          sdkmanager "ndk;27.0.12077973"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> "$GITHUB_ENV"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build JNI library (${{ matrix.abi }})
+        run: |
+          cargo ndk \
+            --target ${{ matrix.abi }} \
+            --platform 26 \
+            -- build --release --features jni
+
+      - name: Locate .so
+        id: sopath
+        run: |
+          SO=$(find target/${{ matrix.target }}/release -name "libsecure_android_vm.so" | head -1)
+          echo "path=$SO" >> "$GITHUB_OUTPUT"
+          echo "Found: $SO"
+
+      # Run patch_so with a dummy secret. In real deployments the secret comes
+      # from tools/gen_assets stderr output and is stored in the secrets manager.
+      - name: Patch integrity slots
+        run: |
+          cargo run --bin patch_so -- \
+            "${{ steps.sopath.outputs.path }}" \
+            "$CI_FIRMWARE_SECRET"
+
+      - name: Verify both slots are non-zero
+        run: |
+          python3 - "${{ steps.sopath.outputs.path }}" <<'EOF'
+          import sys
+          data = open(sys.argv[1], 'rb').read()
+          ok = True
+          for magic in [b'SVMHASH\x00', b'SVMHMAC\x00']:
+              idx = data.find(magic)
+              if idx == -1:
+                  print(f"ERROR: slot {magic} not found in .so")
+                  ok = False
+                  continue
+              payload = data[idx + 8 : idx + 8 + 32]
+              if payload == bytes(32):
+                  print(f"ERROR: slot {magic} is all zeros — patch_so did not run")
+                  ok = False
+              else:
+                  print(f"OK: slot {magic!r} = {payload.hex()[:16]}...")
+          sys.exit(0 if ok else 1)
+          EOF
+
+      # Record the SHA-256 of the final (patched) artifact for provenance.
+      - name: Hash patched .so
+        id: hash
+        run: |
+          SHA=$(sha256sum "${{ steps.sopath.outputs.path }}" | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "$SHA  ${{ steps.sopath.outputs.path }}" > checksums.txt
+          echo "Hash: $SHA"
+
+      - name: Upload patched .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: libsecure_android_vm-${{ matrix.abi }}
+          path: ${{ steps.sopath.outputs.path }}
+          retention-days: 7
+
+      # SLSA Build Level 2 provenance: GitHub-native OIDC attestation covers the
+      # patched artifact. Level 3 (hermetic build service) is future work.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          subject-path: ${{ steps.sopath.outputs.path }}
+
+  # ── 3. gen_assets tool compiles ─────────────────────────────────────────────
+  gen-assets-check:
+    name: Check gen_assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-gen-assets-${{ hashFiles('tools/gen_assets/Cargo.lock') }}
+
+      - name: cargo check gen_assets
+        run: cargo check --manifest-path tools/gen_assets/Cargo.toml
+
+  # ── 4. Fuzz targets compile ──────────────────────────────────────────────────
+  fuzz-check:
+    name: Check fuzz targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly (required by libfuzzer)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Build fuzz targets (compile check only)
+        run: cargo fuzz build --fuzz-dir fuzz
+
+  # ── 5. Obfuscated Android build ─────────────────────────────────────────────
+  # Runs only on pushes to main (not PRs) to avoid blocking developer feedback.
+  # Builds the LLVM plugin against the system LLVM that matches rustc's version,
+  # then cross-compiles the JNI library with CFF + SUB applied via the plugin.
+  android-obfuscated:
+    name: Obfuscated build (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+          - abi: x86_64
+            target: x86_64-linux-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -Z llvm-plugins requires nightly.  We use stable rustc to detect the
+      # LLVM version for building the plugin, then nightly for the actual build.
+      - name: Install Rust stable (for LLVM version detection)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust nightly (for obfuscated build)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+
+      # Determine the LLVM major version bundled with this rustc so we install
+      # an exactly-matching system LLVM for plugin compilation.
+      - name: Detect rustc LLVM version
+        id: llvm_ver
+        run: |
+          VER=$(rustc --version --verbose | grep "LLVM version" | awk '{print $3}' | cut -d. -f1)
+          echo "major=$VER" >> "$GITHUB_OUTPUT"
+          echo "Rustc LLVM major: $VER"
+
+      # apt.llvm.org provides versioned packages for every major LLVM release.
+      - name: Install LLVM ${{ steps.llvm_ver.outputs.major }} dev
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${{ steps.llvm_ver.outputs.major }} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            llvm-${{ steps.llvm_ver.outputs.major }}-dev \
+            libclang-${{ steps.llvm_ver.outputs.major }}-dev \
+            cmake
+
+      # Cache the compiled plugin keyed on: LLVM version + obfuscator source tree.
+      - name: Cache obfuscator plugin
+        id: plugin_cache
+        uses: actions/cache@v4
+        with:
+          path: build/obfuscator
+          key: obfuscator-llvm${{ steps.llvm_ver.outputs.major }}-${{ hashFiles('obfuscator/**') }}-${{ runner.os }}
+
+      - name: Build obfuscator plugin
+        if: steps.plugin_cache.outputs.cache-hit != 'true'
+        env:
+          LLVM_DIR: /usr/lib/llvm-${{ steps.llvm_ver.outputs.major }}/lib/cmake/llvm
+        run: bash scripts/build_obfuscator.sh
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-android-obf-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK r27
+        run: |
+          sdkmanager "ndk;27.0.12077973"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> "$GITHUB_ENV"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build obfuscated JNI library (${{ matrix.abi }})
+        # RUSTFLAGS="-Z llvm-plugins=<path>" is rustc's native plugin mechanism.
+        # -Z requires nightly; the channel is set via RUST_CHANNEL.
+        env:
+          RUST_CHANNEL: nightly
+        run: bash scripts/build_android_obfuscated.sh ${{ matrix.abi }} 26
+
+      - name: Locate .so
+        id: sopath
+        run: |
+          SO=$(find target/${{ matrix.target }}/release-obfuscated \
+               -name "libsecure_android_vm.so" | head -1)
+          echo "path=$SO" >> "$GITHUB_OUTPUT"
+          echo "Found: $SO  ($(du -sh "$SO" | awk '{print $1}'))"
+
+      - name: Patch integrity slots
+        run: |
+          cargo run --bin patch_so -- \
+            "${{ steps.sopath.outputs.path }}" \
+            "$CI_FIRMWARE_SECRET"
+
+      - name: Upload obfuscated .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: libsecure_android_vm-obfuscated-${{ matrix.abi }}
+          path: ${{ steps.sopath.outputs.path }}
+          retention-days: 30
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ${{ steps.sopath.outputs.path }}
+
+  # ── 6. Supply-chain audit ────────────────────────────────────────────────────
+  supply-chain:
+    name: Supply-chain audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-audit-${{ hashFiles('**/Cargo.lock') }}
+
+      # rustsec/audit-check queries the RustSec advisory database and fails the
+      # job if any locked dependency has a known vulnerability (RUSTSEC-*).
+      - name: Audit for known CVEs
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # cargo-deny enforces the license allow-list, source policy, and duplicate
+      # crate ban defined in deny.toml.
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Run cargo-deny
+        run: cargo deny check
