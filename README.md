@@ -2,7 +2,7 @@
 
 A Rust library that embeds a small, protected virtual machine into an Android app. The VM executes encrypted firmware that is cryptographically bound to your app's signing identity — the firmware cannot be extracted from the APK, run in a different app, or tampered with without detection.
 
-**Full technical reference:** [`https://rukmaldias.github.io/citadel/`](https://rukmaldias.github.io/citadel/) — covers requirements, security architecture, design, implementation, LLVM obfuscation layer, asset generation, usage, CI pipeline, and binary blob format specifications.
+**Full technical reference:** [`https://rukmaldias.github.io/citadel/`](hcitadel) — covers requirements, security architecture, design, implementation, LLVM obfuscation layer, asset generation, usage, CI pipeline, and binary blob format specifications.
 
 ---
 
