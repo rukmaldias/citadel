@@ -63,7 +63,7 @@ firmware.bin  ──► AES-256-GCM encrypted
 | Modify `firmware.bin` | Ed25519 signature in `codesign.bin` covers the firmware hash — tampered bytes fail before decryption |
 | Re-sign the APK with a different certificate | License key derivation uses `SHA-256(cert)` — different cert → different key → decryption fails |
 | Sideload the APK | `InstallerPolicy::Required("com.android.vending")` in the license rejects other install sources |
-| Attach a debugger | Six independent checks (TracerPid, wchan, process status, maps patterns, LD_PRELOAD, emulator fingerprints) block startup; all detection strings are obfuscated |
+| Attach a debugger | Six independent checks (TracerPid, wchan, process status, maps patterns, LD_PRELOAD, emulator fingerprints) block startup; all detection strings are obfuscated. Development licences may set bit 1 of `firmware_flags` to permit a debugger; this flag is inside the AES-GCM encrypted licence and cannot be forged |
 | Compute the license key offline | A 32-byte vendor secret (`LICENSE_EMBED_SECRET`, XOR-obfuscated in the `.so`) is appended to the Argon2id password — the attacker must reverse-engineer the binary first |
 | Patch the `.so` binary | SHA-256 + HMAC-SHA-256 slots (embedded by `patch_so`) cover the ELF RX segment; HMAC is keyed from `firmware_secret` and cannot be forged without the license |
 
@@ -208,7 +208,7 @@ The certificate is not secret (it is inside every signed APK), but you need the 
 | `id` | string | Package/customer identifier mixed into the Argon2id password |
 | `installer_policy` | string | `"required:com.android.vending"` (production) or `"any"` (dev) |
 | `valid_until` | u64 | Unix timestamp expiry (0 = never expires) |
-| `firmware_flags` | u32 | Behaviour flags: bit 0 = VM debug mode (0 = production) |
+| `firmware_flags` | u32 | Bitmask: bit 0 = instruction trace, bit 1 = allow debugger. Always `0` in production. |
 
 Production example:
 
@@ -429,7 +429,16 @@ fun runSecureVm(context: Context) {
 
 ## VM debug mode
 
-Set `firmware_flags: 1` in `licensepack.json` to enable per-instruction tracing. Every instruction emits a `[SVM-DEBUG]` line to **stderr** (desktop) or **logcat** (Android):
+`firmware_flags` in `licensepack.json` is a bitmask. Both bits are always `0` in production.
+
+| Bit | Value | Effect |
+|---|---|---|
+| 0 | `1` | Per-instruction logcat trace (`[SVM-DEBUG]` prefix) |
+| 1 | `2` | Allow debugger — suppresses `is_debugger_attached()` checks at startup and during execution |
+
+Set both for a full development licence: `"firmware_flags": 3`
+
+**Instruction trace (bit 0)** — every instruction emits a `[SVM-DEBUG]` line to stderr (desktop) or logcat (Android):
 
 ```
 [SVM-DEBUG] step=     1 pc=    0 instr=PushI64(42)  stack_depth=0
@@ -438,9 +447,11 @@ Set `firmware_flags: 1` in `licensepack.json` to enable per-instruction tracing.
 [SVM-DEBUG] HALT  result=42 steps=2
 ```
 
-The flag is embedded inside the encrypted license at asset-generation time — it cannot be set at runtime without re-issuing the license. `stop()` clears it, so a subsequent `startFromAssets` with a non-debug license starts clean.
+**Allow debugger (bit 1)** — allows the Android Studio debugger to attach during `startFromAssets()`. Root and emulator checks are still enforced. Use a dev licence bound to your **debug signing certificate**; re-issue bound to your **release certificate** before shipping.
 
-> **Never ship production assets with `firmware_flags: 1`.** The trace exposes every intermediate computation value to logcat and slows execution.
+The flags live inside the AES-GCM encrypted licence and cannot be changed at runtime without re-issuing the licence. `stop()` resets both to false.
+
+> **Never ship production assets with `firmware_flags` bits 0 or 1 set.** Bit 0 exposes all intermediate computation values to logcat. Bit 1 allows any debugger to attach and inspect memory freely.
 
 ---
 
