@@ -56,7 +56,7 @@ function HeroBanner() {
   const {siteConfig} = useDocusaurusContext();
   return (
     <div className="hero-banner">
-      <div className="hero-eyebrow">v0.1.0 · MIT License</div>
+      <div className="hero-eyebrow">v0.1.0 · GPL-3.0 License</div>
       <Heading as="h1" className="hero-title">
         {siteConfig.title}
         <span className="hero-title-accent">Secure Android VM</span>
