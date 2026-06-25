@@ -208,7 +208,7 @@ The certificate is not secret (it is inside every signed APK), but you need the 
 | `id` | string | Package/customer identifier mixed into the Argon2id password |
 | `installer_policy` | string | `"required:com.android.vending"` (production) or `"any"` (dev) |
 | `valid_until` | u64 | Unix timestamp expiry (0 = never expires) |
-| `firmware_flags` | u32 | Bitmask: bit 0 = instruction trace, bit 1 = allow debugger. Always `0` in production. |
+| `firmware_flags` | u32 | Bitmask: `0` = production, `1` = trace only, `2` = debugger only, `3` = trace + debugger. Always `0` in production. See [VM debug mode](#vm-debug-mode). |
 
 Production example:
 
