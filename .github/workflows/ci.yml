@@ -51,7 +51,12 @@ jobs:
   android-build:
     name: Build Android (${{ matrix.abi }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
+      fail-fast: false
       matrix:
         include:
           - abi: arm64-v8a
@@ -201,7 +206,12 @@ jobs:
     name: Obfuscated build (${{ matrix.abi }})
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
+      fail-fast: false
       matrix:
         include:
           - abi: arm64-v8a
