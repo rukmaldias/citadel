@@ -6,12 +6,37 @@ sidebar_position: 10
 
 ## Set up the Kotlin wrapper
 
+`SecureVm.kt` **must** live in the `com.example.securevm` package (or whatever package the `.so` was compiled for). The JNI function names inside the native library are hardcoded as `Java_com_example_securevm_SecureVm_*` — if the Kotlin class is in a different package, the JNI linkage fails at runtime with `UnsatisfiedLinkError`.
+
+**Option A — keep the default package (quickest):**
+
+Copy the wrapper into your project keeping its original package path:
+
 ```bash
 cp android/SecureVm.kt \
-   android-app/app/src/main/java/com/yourcompany/yourapp/SecureVm.kt
+   app/src/main/java/com/example/securevm/SecureVm.kt
 ```
 
-Update the first line of the file and the JNI export names in `src/jni_api.rs` to match your package name, then rebuild the `.so`.
+Your own Activity lives alongside it in your own package:
+
+```
+java/
+├── com/example/securevm/
+│   └── SecureVm.kt          ← must match the .so's JNI export prefix
+└── com/yourcompany/yourapp/
+    └── MainActivity.kt      ← your app code
+```
+
+**Option B — rename to your own package (recommended for production):**
+
+1. Edit every `Java_com_example_securevm_SecureVm_` prefix in `src/jni_api.rs` to match your package (e.g. `Java_com_yourcompany_yourapp_SecureVm_`).
+2. Rebuild the `.so` files with `cargo ndk`.
+3. Copy `SecureVm.kt` to your chosen path and update its `package` declaration to match.
+4. Update the `-keep class` rule in `proguard-rules.pro` to the new class name.
+
+:::danger
+Do not copy `SecureVm.kt` to a different package without also recompiling the `.so`. The copy will compile, but every JNI call will throw `UnsatisfiedLinkError` at runtime.
+:::
 
 ## Starting the VM: basic pattern
 
